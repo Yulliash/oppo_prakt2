@@ -103,6 +103,10 @@ void printData(const vector<pokazania>& data) {
     }
 }
 
+
+
+
+
 // Точка входа в программу
 int main() {
     setlocale(0, ""); // Для поддержки русского языка в консоли
