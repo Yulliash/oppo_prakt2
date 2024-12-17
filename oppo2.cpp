@@ -1,119 +1,178 @@
 ﻿#include <iostream>
 #include <fstream>
-#include <string>
 #include <vector>
+#include <string>
 #include <regex>
 #include <algorithm>
-#include <cctype>
+#include <sstream>
+#include <numeric>
 using namespace std;
 
 struct pokazania {
-    string resyrs; // Тип ресурса
-    string date;   // Дата
-    double znach = 0.0; // Значение
+	string resyrs; // Тип ресурса
+	string date;   // Дата
+	double znach = 0.0; // Значение
 };
 
 // Удаление лишних пробелов
-void trim(string& s) {
-    s.erase(s.begin(), find_if(s.begin(), s.end(), [](unsigned char ch) { return !isspace(ch); }));
-    s.erase(find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !isspace(ch); }).base(), s.end());
+string trim(string s) {
+	s.erase(0, s.find_first_not_of(" \t"));
+	s.erase(s.find_last_not_of(" \t") + 1);
+	return s;
 }
 
-// Функция для проверки строки (дополнительная валидация)
+// Функция для проверки строки 
 bool validateLine(const string& resyrs, const string& date, double znach) {
-    regex date_regex(R"(\d{4}\.\d{2}\.\d{2})"); // Формат YYYY.MM.DD
-    if (!regex_match(date, date_regex)) {
-        cerr << "Ошибка: Некорректная дата: " << date << "\n";
-        return false;
-    }
-    if (resyrs.empty()) {
-        cerr << "Ошибка: Тип ресурса не указан.\n";
-        return false;
-    }
-    if (znach < 0) {
-        cerr << "Ошибка: Отрицательное значение: " << znach << "\n";
-        return false;
-    }
-    return true;
+	regex date_regex(R"(\d{4}\.\d{2}\.\d{2})"); // Формат YYYY.MM.DD
+	if (!regex_match(date, date_regex)) {
+		cerr << "Ошибка: Некорректная дата: " << date << "\n";
+		return false;
+	}
+	if (resyrs.empty()) {
+		cerr << "Ошибка: Тип ресурса не указан.\n";
+		return false;
+	}
+	if (znach < 0) {
+		cerr << "Ошибка: Отрицательное значение: " << znach << "\n";
+		return false;
+	}
+	return true;
+}
+
+string removeQuotes(const string& s) {
+	if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
+		return s.substr(1, s.size() - 2);
+	}
+	return s;
 }
 
 // Функция для чтения данных из файла
 vector<pokazania> readDataFromFile(const string& filename) {
-    ifstream ist(filename);
-    if (!ist) {
-        cerr << "Ошибка: Не удалось открыть файл: " << filename << "\n";
-        return {};
-    }
+	ifstream ist(filename);
+	if (!ist) {
+		cerr << "Ошибка: Не удалось открыть файл: " << filename << "\n";
+		return {};
+	}
 
-    vector<pokazania> data;
-    string line;
 
-    // Регулярные выражения для разных форматов
-    regex format1(R"((\d{4}\.\d{2}\.\d{2})\s+([\d.]+)\s+(.+))"); // Дата Значение "Ресурс"
-    regex format2(R"((.+)\s+(\d{4}\.\d{2}\.\d{2})\s+([\d.]+))"); // "Ресурс" Дата Значение
-    regex format3(R"(([\d.]+)\s+(.+)\s+(\d{4}\.\d{2}\.\d{2}))"); // Значение "Ресурс" Дата
+	vector<pokazania> data;
+	string line;
 
-    while (getline(ist, line)) {
-        trim(line); // Убираем пробелы
-        smatch match;
-        pokazania obj;
+	// Регулярные выражения для разных форматов
+	regex format1(R"((\d{4}\.\d{2}\.\d{2})\s+([\d.]+)\s+(.+))"); // Дата Значение "Ресурс"
+	regex format2(R"((.+)\s+(\d{4}\.\d{2}\.\d{2})\s+([\d.]+))"); // "Ресурс" Дата Значение
+	regex format3(R"(([\d.]+)\s+(.+)\s+(\d{4}\.\d{2}\.\d{2}))"); // Значение "Ресурс" Дата
 
-        // Проверка строки на соответствие каждому формату
-        if (regex_match(line, match, format1)) {
-            obj.date = match[1];
-            obj.znach = stod(match[2]);
-            obj.resyrs = match[3];
-        }
-        else if (regex_match(line, match, format2)) {
-            obj.resyrs = match[1];
-            obj.date = match[2];
-            obj.znach = stod(match[3]);
-        }
-        else if (regex_match(line, match, format3)) {
-            obj.znach = stod(match[1]);
-            obj.resyrs = match[2];
-            obj.date = match[3];
-        }
-        else {
-            cerr << "Ошибка: Строка не соответствует ни одному формату: " << line << "\n";
-            continue;
-        }
+	while (getline(ist, line)) {
+		trim(line); // Убираем пробелы
+		smatch match;
+		pokazania obj;
 
-        // Проверка корректности данных
-        if (validateLine(obj.resyrs, obj.date, obj.znach)) {
-            data.push_back(obj);
-        }
-    }
+		// Проверка строки на соответствие каждому формату
+		if (regex_match(line, match, format1)) {
+			obj.date = match[1];
+			obj.znach = stod(match[2]);
+			obj.resyrs = removeQuotes(match[3]);
+		}
+		else if (regex_match(line, match, format2)) {
+			obj.resyrs = removeQuotes(match[1]);
+			obj.date = match[2];
+			obj.znach = stod(match[3]);
+		}
+		else if (regex_match(line, match, format3)) {
+			obj.znach = stod(match[1]);
+			obj.resyrs = removeQuotes(match[2]);
+			obj.date = match[3];
+		}
+		else {
+			cerr << "Ошибка: Строка не соответствует ни одному формату: " << line << "\n";
+			continue;
+		}
 
-    return data;
+		// Проверка корректности данных
+		if (validateLine(obj.resyrs, obj.date, obj.znach)) {
+			data.push_back(obj);
+		}
+	}
+
+	return data;
 }
 
 // Функция для вывода данных
 void printData(const vector<pokazania>& data) {
-    if (data.empty()) {
-        cout << "Данные отсутствуют или некорректны.\n";
-        return;
-    }
+	if (data.empty()) {
+		cout << "Данные отсутствуют или некорректны.\n";
+		return;
+	}
 
-    for (const auto& entry : data) {
-        cout << "Показания счётчика:\n";
-        cout << "Тип ресурса: " << entry.resyrs << "\n";
-        cout << "Дата: " << entry.date << "\n";
-        cout << "Значение: " << entry.znach << "\n\n";
-    }
+	for (const auto& entry : data) {
+		cout << "Показания счётчика:\n";
+		cout << "Тип ресурса: " << entry.resyrs << "\n";
+		cout << "Дата: " << entry.date << "\n";
+		cout << "Значение: " << entry.znach << "\n\n";
+	}
 }
 
+// Функция для преобразования строки даты в числовое значение для сравнения
+int dateToNumber(const string& date) {
+	istringstream ss(date);
+	int year, month, day;
+	char dot;
+	ss >> year >> dot >> month >> dot >> day;
+	return year * 10000 + month * 100 + day; // Преобразуем в формат YYYYMMDD
+}
 
+// Функция для подсчета суммарного потребления ресурса за период времени
+void totalConsumption(const vector<pokazania>& data) {
+	string resource, start_date, end_date;
+	cout << "Введите тип ресурса: ";
+	getline(cin, resource);
+	cout << "Введите начальную дату (YYYY.MM.DD): ";
+	cin >> start_date;
+	cout << "Введите конечную дату (YYYY.MM.DD): ";
+	cin >> end_date;
+	// Подсчёт с использованием std::accumulate
+	double total = accumulate(data.begin(), data.end(), 0.0,
+		[&](double sum, const pokazania& entry) {
+		if (entry.resyrs == resource &&
+			entry.date >= start_date && entry.date <= end_date) {
+			return sum + entry.znach;
+		}
+		return sum;
+	});
+
+	cout << "Суммарное потребление ресурса \"" << resource << "\" с "
+		<< start_date << " по " << end_date << " составляет: " << total << endl;
+}
+
+// Вспомогательный компаратор для сортировки по дате
+bool compareByDate(const pokazania& a, const pokazania& b) {
+	return a.date < b.date; // Лексикографическое сравнение дат
+}
+
+// Функция для сортировки данных по дате
+void sortByDate(vector<pokazania>& data) {
+	stable_sort(data.begin(), data.end(), compareByDate);
+
+	cout << "Данные отсортированы по дате:\n";
+	for_each(data.begin(), data.end(), [](const pokazania& entry) {
+		cout << "Тип ресурса: " << entry.resyrs << "\n";
+		cout << "Дата: " << entry.date << "\n";
+		cout << "Значение: " << entry.znach << "\n\n";
+	});
+}
 
 
 
 // Точка входа в программу
 int main() {
-    setlocale(0, ""); // Для поддержки русского языка в консоли
+	setlocale(LC_ALL, "Russian");
+	string filename = "1.txt"; // Имя файла
+	vector<pokazania> data = readDataFromFile(filename);
+	printData(data);
+	// Вызов функций
+	totalConsumption(data); // Подсчёт суммарного потребления
+	sortByDate(data);       // Сортировка по дате
 
-    string filename = "1.txt"; // Имя файла
-    vector<pokazania> data = readDataFromFile(filename);
-    printData(data);
-
-    return 0;
+	return 0;
 }
