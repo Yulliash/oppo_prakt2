@@ -1,10 +1,10 @@
 ﻿#include <iostream>
 #include <fstream>
-#include <string>
 #include <vector>
+#include <string>
 #include <regex>
 #include <algorithm>
-#include <cctype>
+#include <sstream>
 using namespace std;
 
 struct pokazania {
@@ -14,12 +14,13 @@ struct pokazania {
 };
 
 // Удаление лишних пробелов
-void trim(string& s) {
-    s.erase(s.begin(), find_if(s.begin(), s.end(), [](unsigned char ch) { return !isspace(ch); }));
-    s.erase(find_if(s.rbegin(), s.rend(), [](unsigned char ch) { return !isspace(ch); }).base(), s.end());
+string trim(string s) {
+    s.erase(0, s.find_first_not_of(" \t"));
+    s.erase(s.find_last_not_of(" \t") + 1);
+    return s;
 }
 
-// Функция для проверки строки (дополнительная валидация)
+// Функция для проверки строки 
 bool validateLine(const string& resyrs, const string& date, double znach) {
     regex date_regex(R"(\d{4}\.\d{2}\.\d{2})"); // Формат YYYY.MM.DD
     if (!regex_match(date, date_regex)) {
@@ -37,6 +38,13 @@ bool validateLine(const string& resyrs, const string& date, double znach) {
     return true;
 }
 
+string removeQuotes(const string& s) {
+    if (s.size() >= 2 && s.front() == '"' && s.back() == '"') {
+        return s.substr(1, s.size() - 2);
+    }
+    return s;
+}
+
 // Функция для чтения данных из файла
 vector<pokazania> readDataFromFile(const string& filename) {
     ifstream ist(filename);
@@ -44,6 +52,7 @@ vector<pokazania> readDataFromFile(const string& filename) {
         cerr << "Ошибка: Не удалось открыть файл: " << filename << "\n";
         return {};
     }
+
 
     vector<pokazania> data;
     string line;
@@ -62,16 +71,16 @@ vector<pokazania> readDataFromFile(const string& filename) {
         if (regex_match(line, match, format1)) {
             obj.date = match[1];
             obj.znach = stod(match[2]);
-            obj.resyrs = match[3];
+            obj.resyrs = removeQuotes(match[3]);
         }
         else if (regex_match(line, match, format2)) {
-            obj.resyrs = match[1];
+            obj.resyrs = removeQuotes(match[1]);
             obj.date = match[2];
             obj.znach = stod(match[3]);
         }
         else if (regex_match(line, match, format3)) {
             obj.znach = stod(match[1]);
-            obj.resyrs = match[2];
+            obj.resyrs = removeQuotes(match[2]);
             obj.date = match[3];
         }
         else {
@@ -103,17 +112,62 @@ void printData(const vector<pokazania>& data) {
     }
 }
 
+// Функция для преобразования строки даты в числовое значение для сравнения
+int dateToNumber(const string& date) {
+    istringstream ss(date);
+    int year, month, day;
+    char dot;
+    ss >> year >> dot >> month >> dot >> day;
+    return year * 10000 + month * 100 + day; // Преобразуем в формат YYYYMMDD
+}
 
+// Функция для подсчета суммарного потребления ресурса за период времени
+void totalConsumption(const vector<pokazania>& data) {
+    string resource, start_date, end_date;
+    cout << "Введите тип ресурса: ";
+    getline(cin, resource);
+    cout << "Введите начальную дату (YYYY.MM.DD): ";
+    cin >> start_date;
+    cout << "Введите конечную дату (YYYY.MM.DD): ";
+    cin >> end_date;
 
+    double total = 0.0;
+    int start = dateToNumber(start_date);
+    int end = dateToNumber(end_date);
+
+    for (const auto& entry : data) {
+        int current_date = dateToNumber(entry.date);
+        if (entry.resyrs == resource && current_date >= start && current_date <= end) {
+            total += entry.znach;
+        }
+    }
+
+    cout << "Суммарное потребление ресурса \"" << resource << "\" с "
+        << start_date << " по " << end_date << " составляет: " << total << endl;
+}
+
+// Функция для сортировки данных по дате
+void sortByDate(vector<pokazania>& data) {
+    sort(data.begin(), data.end(), [](const pokazania& a, const pokazania& b) {
+        return dateToNumber(a.date) < dateToNumber(b.date);
+        });
+
+    cout << "Данные отсортированы по дате:\n";
+    printData(data);
+}
 
 
 // Точка входа в программу
 int main() {
-    setlocale(0, ""); // Для поддержки русского языка в консоли
-
+    setlocale(LC_ALL, "Russian");
     string filename = "1.txt"; // Имя файла
     vector<pokazania> data = readDataFromFile(filename);
     printData(data);
+    cin.ignore(); // Очистка буфера перед вводом строки
+    // Вызов функций
+    totalConsumption(data); // Подсчёт суммарного потребления
+    sortByDate(data);       // Сортировка по дате
 
     return 0;
 }
+
